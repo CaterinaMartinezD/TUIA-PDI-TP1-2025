@@ -262,7 +262,7 @@ def detectar_rta_respondida(circulos, recortes):
         resultado.append(rtas_imagen)
     return resultado
 
-def corregir_y_mostrar(letras_img, imagenes, renglones_img, mostrar=False):
+def corregir_examen(letras_img):
     #Se genera una lista con las respuestas correctas
     respuestas = ['A', 'A', 'B', 'A', 'D', 'B', 'B', 'C', 'B', 'A', 'D', 'A', 'C', 'C', 'D', 'B', 'A', 'C', 'C', 'D', 'B', 'A', 'C', 'C', 'C']
     resultado = []
@@ -275,13 +275,15 @@ def corregir_y_mostrar(letras_img, imagenes, renglones_img, mostrar=False):
                 img_resultado.append("OK")                                                       #Si es correcta la respuesta guarda "OK" en la lista                      
             else:
                 img_resultado.append("MAL")                                                      #Si es incorrecta la respuesta guarda "MAL" en la lista  
-
         resultado.append(img_resultado)                                                          #Guarda los resultados de esa imagen
 
-    for idx_img, (img, renglones, correcciones) in enumerate(zip(imagenes, renglones_img, resultado)):
+    return resultado
+
+def mostrar_correcciones_examen(imagenes, renglones_img, correcciones, mostrar = False):
+    for idx_img, (img, renglones, correcciones_img) in enumerate(zip(imagenes, renglones_img, correcciones)):
         img_copia = cv2.cvtColor(img.copy(), cv2.COLOR_GRAY2BGR)                                 #Convierte la imagen a RGB para dibujar la rta en color
 
-        for (fila_i, fila_f, col_i, col_f), correccion in zip(renglones, correcciones):          #Recorre cada renglon respecto a sus correcciones
+        for (fila_i, fila_f, col_i, col_f), correccion in zip(renglones, correcciones_img):          #Recorre cada renglon respecto a sus correcciones
             x_texto = col_f + 15
             y_texto = fila_f
             cv2.putText(img_copia, correccion, (x_texto, y_texto), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 2, cv2.LINE_AA)
@@ -290,8 +292,137 @@ def corregir_y_mostrar(letras_img, imagenes, renglones_img, mostrar=False):
             plt.imshow(img_copia)
             plt.title(f"Imagen {idx_img + 1} – Correcciones")
             plt.show()
+            
+    return
 
-    return resultado
+def detectar_datos_encabezado(recortes, mostrar = False):
+    datos_encabezado = []
+
+    for idx, recortes_img in enumerate(recortes):                                               #Recorre los datos por cada indice y recorte de la lista
+        recortes_img = recortes_img[0]                                                          #Se obtiene solamente el primer elemento que es el encabezado
+        _, binaria = cv2.threshold(recortes_img, 150, 255, cv2.THRESH_BINARY_INV)               #Convierte la imagen a binario invertido
+
+        #Recorta la imagen para obtener los datos necesarios
+        nombre = binaria[5:20, 97:280]
+        id_img = binaria[5:20, 331:430]
+        code = binaria[5:20, 491:565]
+        date = binaria[5:20, 651:767]
+
+        datos_encabezado.append([nombre, id_img, code, date])                                   #Guarda los 4 datos como una lista en "datos_encabezado"
+
+        if mostrar:
+            titulos = ["Nombre", "ID", "Código", "Fecha"]
+            partes = [nombre, id_img, code, date]
+
+            for i, parte in enumerate(partes):
+                plt.imshow(parte, cmap='gray')
+                plt.title(f'Imagen {idx + 1} – {titulos[i]}')
+                plt.show()      
+
+    return datos_encabezado
+
+def analizar_datos_encabezado(datos_encabezado, respuesta = False):
+    nombre_campos = ["Nombre", "ID", "Código", "Fecha"]                                        #Lista con los 
+
+    for idx, campos in enumerate(datos_encabezado):                                            #Itera sobre cada recorte del campo encabezado                                    
+
+        for j, campo_img in enumerate(campos):                                                 
+            col_con_letra = campo_img.any(axis=0)                                              #Detecta las letras por los pixeles blancos
+            cambios = np.diff(col_con_letra.astype(np.int8))                                   #Detectar transiciones inicio/fin
+            letras_indxs = np.argwhere(cambios != 0)                                           #Almacena los indices donde surge ese cambio
+
+            for i in range(0, len(letras_indxs), 2):                                           #Ajustar inicio de letras
+                letras_indxs[i] += 1
+
+            letras_indxs = letras_indxs.reshape((-1, 2))                                       #Cada fila de letras_indxs contiene el inicio y final de cada letra.
+            nuevos_indices = []
+
+            for inicio, fin in letras_indxs:                                                   #Recorre cada letra por su inicio-fin
+                ancho = fin - inicio                                                           
+                if ancho > 10:                                                                 #Este umbral sirve para separar letras si es muy ancha
+                    mitad = (inicio + fin) // 2
+                    nuevos_indices.append([inicio, mitad])
+                    nuevos_indices.append([mitad + 1, fin])
+                else:
+                    nuevos_indices.append([inicio, fin])
+
+            letras_indxs = np.array(nuevos_indices)                                            #Convierte la lista en un array
+
+
+            cant_letras = len(letras_indxs)                                                    #Obtiene la cantidad de letras detectadas
+            espacios_validos = 0                                                               #Se inicializa el parametro
+
+            for k in range(len(letras_indxs) - 1):                                             
+                espacio = letras_indxs[k + 1][0] - letras_indxs[k][1]                          #Obtiene el espacio entre letras
+                if espacio == 6:                                                               #Si el espacio es mayor a 6, incrementa el parametro
+                    espacios_validos += 1
+                    
+            if j == 0:                                                                        #Nombre
+                valido = cant_letras <= 25 and espacios_validos >= 1                          #Debe contener al menos dos palabras y no mas de 25 caracteres en total
+            elif j == 1:                                                                      #ID
+                valido = cant_letras == 8 and espacios_validos == 0                           #Debe contener solo 8 caracteres en total, formando una unica palabra
+            elif j == 2:                                                                      #Codigo
+                valido = cant_letras == 1                                                     #Debe contener un unico caracter
+            elif j == 3:                                                                      #Fecha
+                valido = cant_letras == 8 and espacios_validos == 0                           #Debe contener solo 8 caracteres en total, formando una unica palabra
+
+            if (respuesta == True):                                                           #Imprime en la terminal los datos obtenidos por cada imagen
+                print(f"\nImagen {idx + 1}")
+                print(f"{nombre_campos[j]}: {'OK' if valido else 'MAL'}")                     
+    return       
+
+def desempeño_alumno(correccion_alumno, mostrar_rta = False):
+    resultados = []
+
+    for idx, respuestas in enumerate(correccion_alumno):
+        correctas = 0
+        evaluacion = []
+
+        for i, rta in enumerate(respuestas):
+            if (rta == 'OK'):
+                correctas += 1
+        
+        if (correctas >= 20):
+            nota = 'APROBADO'
+            evaluacion.append(nota)
+        else:
+            nota = 'DESAPROBADO'
+            evaluacion.append(nota)
+        
+        if mostrar_rta:
+            print(f"\nImagen {idx + 1}")
+            print(f"Respuestas correctas: {correctas}")
+            print(f"Calificación: {nota}\n")
+        
+        resultados.append(evaluacion)
+
+    return resultados
+
+def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
+    filas = []  
+
+    for idx, (campos, nota) in enumerate(zip(recorte_encabezado, calificaciones)):
+        nombre = campos[0]                                                                   #Obtiene el recorte del nombre
+        nombre = cv2.bitwise_not(nombre)                                                     #Invierte el color del fondo y las letras
+        nombre_copia = nombre.copy()                                                         #Crea una copia del nombre
+
+        # Escribe la calificación sobre la imagen
+        if nota == 'APROBADO':
+            cv2.putText(nombre_copia, '+', (140, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 0, 1, cv2.LINE_AA)
+        else:
+            cv2.putText(nombre_copia, '-', (140, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 0, 1, cv2.LINE_AA)
+
+        filas.append(nombre_copia)                                                           #Guarda la imagen modificada en la lista
+        print("Ancho del recorte:", nombre.shape[1])
+
+    if mostrar and filas:                                                                    
+        imagen_final = np.vstack(filas)                                                      #Une las imagenes verticalmente en una sola
+        plt.figure()
+        plt.title("Calificaciones Finales: aprobado(+)/ desaprobado(-)")
+        plt.imshow(imagen_final, cmap='gray')
+        plt.show()
+
+    return
 
 
 #------------------------------------------------------------------------------------------------------------------------------------
@@ -299,41 +430,16 @@ def corregir_y_mostrar(letras_img, imagenes, renglones_img, mostrar=False):
 rutas = ['multiple_choice_1.png','multiple_choice_2.png','multiple_choice_3.png','multiple_choice_4.png','multiple_choice_5.png'] 
 imagenes = cargar_imagenes(rutas, mostrar = False)
 renglones_img, encabezado = renglones(imagenes, mostrar = False)
+
 renglones_con_limites = detectar_limites_rta(imagenes, renglones_img, mostrar = False)
 recortes_img = recorte(imagenes, renglones_con_limites, encabezado, mostrar = False)
 detectar_circulos_img = detectar_circulos(recortes_img, mostrar = False)
 rta_alumno = detectar_rta_respondida(detectar_circulos_img, recortes_img)
-correccion_respuestas_img = corregir_y_mostrar(rta_alumno, imagenes, renglones_con_limites, mostrar = False)
+correccion_respuestas_img = corregir_examen(rta_alumno)
+mostrar_correccion_rta = mostrar_correcciones_examen(imagenes, renglones_con_limites, correccion_respuestas_img, mostrar = False)
 
+datos_encabezado = detectar_datos_encabezado(recortes_img, mostrar = False)
+correccion_encabezado = analizar_datos_encabezado(datos_encabezado, respuesta = False)
 
-
-'''
-
-#Para ver como se detectan las letras
-for idx_img, rtas in enumerate(detectar_letras_img):
-    print(f"\nResultados Imagen {idx_img+1}")
-    for q_num, letra in enumerate(rtas, start=1):
-        print(f"Pregunta {q_num:2d}: {letra}")
-
-        
-#Prueba de donde saque los valores para analizar los renglones
-umbral = 150
-_, binaria = cv2.threshold(f, umbral, 255, cv2.THRESH_BINARY_INV)
-proyeccion = np.sum(binaria, axis=1)
-
-plt.figure()
-plt.plot(proyeccion)
-plt.title("Proyección Horizontal")
-plt.xlabel("Fila")
-plt.ylabel("Suma de píxeles")
-plt.show()
-
-# Crear un histograma de la proyección horizontal
-plt.figure()
-plt.hist(proyeccion, bins=50, color='gray', edgecolor='black')
-plt.title("Histograma de la Proyección Horizontal")
-plt.xlabel("Suma de Píxeles por Fila")
-plt.ylabel("Frecuencia")
-plt.show()
-
-'''
+desempeño = desempeño_alumno(correccion_respuestas_img, mostrar_rta = False)
+mostrar_desempeño = mostrar_calificaciones(desempeño, datos_encabezado, mostrar = False)
