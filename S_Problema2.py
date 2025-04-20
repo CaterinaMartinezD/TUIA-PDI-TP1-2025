@@ -322,9 +322,11 @@ def detectar_datos_encabezado(recortes, mostrar = False):
     return datos_encabezado
 
 def analizar_datos_encabezado(datos_encabezado, respuesta = False):
-    nombre_campos = ["Nombre", "ID", "Código", "Fecha"]                                        #Lista con los 
+    nombre_campos = ["Nombre", "ID", "Código", "Fecha"]                                        
+    resultados = []
 
     for idx, campos in enumerate(datos_encabezado):                                            #Itera sobre cada recorte del campo encabezado                                    
+        evaluacion_img = []
 
         for j, campo_img in enumerate(campos):                                                 
             col_con_letra = campo_img.any(axis=0)                                              #Detecta las letras por los pixeles blancos
@@ -366,37 +368,42 @@ def analizar_datos_encabezado(datos_encabezado, respuesta = False):
             elif j == 3:                                                                      #Fecha
                 valido = cant_letras == 8 and espacios_validos == 0                           #Debe contener solo 8 caracteres en total, formando una unica palabra
 
+            resultado = "OK" if valido else "MAL"
+            evaluacion_img.append(resultado)
+
             if (respuesta == True):                                                           #Imprime en la terminal los datos obtenidos por cada imagen
                 print(f"\nImagen {idx + 1}")
-                print(f"{nombre_campos[j]}: {'OK' if valido else 'MAL'}")                     
-    return       
+                print(f"{nombre_campos[j]}: {resultado}") 
 
-def desempeño_alumno(correccion_alumno, mostrar_rta = False):
+        resultados.append(evaluacion_img)                    
+    return  resultados     
+
+def desempeño_alumno(correccion_alumno, datos_encabezado, correccion_encabezado, mostrar_rta=False):
     resultados = []
+    titulos = ["name", "id", "code", "date"]
 
-    for idx, respuestas in enumerate(correccion_alumno):
-        correctas = 0
-        evaluacion = []
-
-        for i, rta in enumerate(respuestas):
-            if (rta == 'OK'):
-                correctas += 1
-        
-        if (correctas >= 20):
-            nota = 'APROBADO'
-            evaluacion.append(nota)
-        else:
-            nota = 'DESAPROBADO'
-            evaluacion.append(nota)
-        
-        if mostrar_rta:
-            print(f"\nImagen {idx + 1}")
-            print(f"Respuestas correctas: {correctas}")
-            print(f"Calificación: {nota}\n")
-        
+    for idx, (respuestas, encabezado_eval) in enumerate(zip(correccion_alumno, correccion_encabezado)):
+        correctas = sum(1 for r in respuestas if r == 'OK')
+        nota = 'APROBADO' if correctas >= 20 else 'DESAPROBADO'
+        evaluacion = [nota]
         resultados.append(evaluacion)
 
+        if mostrar_rta:
+            print(f"\nImagen {idx + 1}")
+
+            # Mostrar estado del encabezado con los resultados de corrección
+            for titulo, estado in zip(titulos, encabezado_eval):
+                print(f"{titulo} : {estado}")
+
+            # Mostrar evaluación de respuestas
+            for i, rta in enumerate(respuestas):
+                print(f"Pregunta {i + 1}: {rta}")
+
+            print(f"Cantidad de respuestas correctas: {correctas}")
+            print(f"Calificación: {nota}\n")
+
     return resultados
+
 
 def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
     filas = []  
@@ -413,7 +420,6 @@ def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
             cv2.putText(nombre_copia, '-', (140, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 0, 1, cv2.LINE_AA)
 
         filas.append(nombre_copia)                                                           #Guarda la imagen modificada en la lista
-        print("Ancho del recorte:", nombre.shape[1])
 
     if mostrar and filas:                                                                    
         imagen_final = np.vstack(filas)                                                      #Une las imagenes verticalmente en una sola
@@ -440,6 +446,5 @@ mostrar_correccion_rta = mostrar_correcciones_examen(imagenes, renglones_con_lim
 
 datos_encabezado = detectar_datos_encabezado(recortes_img, mostrar = False)
 correccion_encabezado = analizar_datos_encabezado(datos_encabezado, respuesta = False)
-
-desempeño = desempeño_alumno(correccion_respuestas_img, mostrar_rta = False)
+desempeño = desempeño_alumno(correccion_respuestas_img, datos_encabezado, correccion_encabezado, mostrar_rta = False)
 mostrar_desempeño = mostrar_calificaciones(desempeño, datos_encabezado, mostrar = False)
