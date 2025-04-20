@@ -432,7 +432,8 @@ def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
-rutas = ['multiple_choice_1.png','multiple_choice_2.png','multiple_choice_3.png','multiple_choice_4.png','multiple_choice_5.png'] 
+rutas = ['multiple_choice_1.png','multiple_choice_2.png','multiple_choice_3.png','multiple_choice_4.png','multiple_choice_5.png']
+
 imagenes = cargar_imagenes(rutas, mostrar = False)
 renglones_img, encabezado = renglones(imagenes, mostrar = False)
 
@@ -441,7 +442,7 @@ recortes_img = recorte(imagenes, renglones_con_limites, encabezado, mostrar = Fa
 detectar_circulos_img = detectar_circulos(recortes_img, mostrar = False)
 rta_alumno = detectar_rta_respondida(detectar_circulos_img, recortes_img)
 correccion_respuestas_img = corregir_examen(rta_alumno)
-mostrar_correccion_rta = mostrar_correcciones_examen(imagenes, renglones_con_limites, correccion_respuestas_img, mostrar = False)
+mostrar_correccion_rta = mostrar_correcciones_examen(imagenes, renglones_con_limites, correccion_respuestas_img, mostrar = True)
 
 datos_encabezado = detectar_datos_encabezado(recortes_img, mostrar = False)
 correccion_encabezado = analizar_datos_encabezado(datos_encabezado, respuesta = False)
