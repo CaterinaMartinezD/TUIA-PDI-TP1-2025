@@ -247,7 +247,7 @@ def detectar_rta_respondida(circulos, recortes):
             cantidad_marcados = 0                                                               #Contador de circulos marcados
             indice_marcado = -1                                                                 #Guarda el indice si hay solo uno
             for i in range(len(pixeles_por_circulo)):                                           #Recorre los valores de pixeles respecto a los contados
-                if pixeles_por_circulo[i] > 250:                                                #Si un circulo tiene mas de 250px blancos se considera marcada
+                if pixeles_por_circulo[i] > 200:                                                #Si un circulo tiene mas de 250px blancos se considera marcada
                     cantidad_marcados += 1
                     if cantidad_marcados == 1:
                         indice_marcado = i
@@ -404,7 +404,6 @@ def desempeño_alumno(correccion_alumno, datos_encabezado, correccion_encabezado
 
     return resultados
 
-
 def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
     filas = []  
 
@@ -414,7 +413,7 @@ def mostrar_calificaciones(calificaciones, recorte_encabezado, mostrar = False):
         nombre_copia = nombre.copy()                                                         #Crea una copia del nombre
 
         # Escribe la calificación sobre la imagen
-        if nota == 'APROBADO':
+        if nota[0] == 'APROBADO':
             cv2.putText(nombre_copia, '+', (140, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 0, 1, cv2.LINE_AA)
         else:
             cv2.putText(nombre_copia, '-', (140, 14), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 0, 1, cv2.LINE_AA)
@@ -447,4 +446,4 @@ mostrar_correccion_rta = mostrar_correcciones_examen(imagenes, renglones_con_lim
 datos_encabezado = detectar_datos_encabezado(recortes_img, mostrar = False)
 correccion_encabezado = analizar_datos_encabezado(datos_encabezado, respuesta = False)
 desempeño = desempeño_alumno(correccion_respuestas_img, datos_encabezado, correccion_encabezado, mostrar_rta = False)
-mostrar_desempeño = mostrar_calificaciones(desempeño, datos_encabezado, mostrar = False)
+mostrar_desempeño = mostrar_calificaciones(desempeño, datos_encabezado, mostrar = True)
